@@ -349,7 +349,7 @@ textarea:focus {
 /* 近十窑开裂条形图 */
 .bar-row {
   display: grid;
-  grid-template-columns: 140px 90px 1fr 120px;
+  grid-template-columns: 140px 90px 1fr auto;
   gap: 10px;
   align-items: center;
   padding: 5px 0;
@@ -376,6 +376,7 @@ textarea:focus {
 }
 .bar-num {
   font-size: 13px;
+  white-space: nowrap;
 }
 .summary {
   margin-top: 10px;
@@ -535,4 +536,65 @@ textarea:focus {
   border: 1px solid var(--bad);
   border-radius: 8px;
   padding: 10px 14px;
+}
+
+/* 顶栏导航 */
+.topnav {
+  display: flex;
+  gap: 4px;
+}
+.topnav a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.topnav a.router-link-active {
+  color: var(--accent-dark);
+  background: #f3e9dc;
+  font-weight: 600;
+}
+
+/* 窑炉档案 */
+.kiln-ops {
+  white-space: nowrap;
+}
+.kiln-ops .btn {
+  margin-right: 6px;
+}
+.merge-row td {
+  background: #fdf6ec;
+  font-size: 13px;
+}
+.merge-row select {
+  margin: 0 6px;
+}
+
+/* 建窑次时手改层数/窑位、与档案规格不一致的提示 */
+.override-hint {
+  color: #a66f00;
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+/* 开裂统计「按窑次 / 按窑炉」切换 */
+.stat-toggle {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.stat-toggle button {
+  font: inherit;
+  border: none;
+  background: #fff;
+  color: var(--muted);
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.stat-toggle button.on {
+  background: var(--accent);
+  color: #fff;
 }

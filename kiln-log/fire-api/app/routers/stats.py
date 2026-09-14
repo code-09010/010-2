@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import CurveSegment, Firing, Piece
-from ..schemas import CrackStat
+from ..schemas import CrackStat, KilnCrackStat
 
 router = APIRouter(prefix="/api/stats", tags=["统计"])
 
@@ -55,3 +55,43 @@ def crack_stats(
         )
         for f in firings
     ]
+
+
+@router.get("/cracks/by-kiln", response_model=list[KilnCrackStat])
+def crack_stats_by_kiln(db: Session = Depends(get_db)):
+    """按窑炉归组看开裂：哪口窑爱裂、裂多少。没挂档案的老窑次按名字自成一组。"""
+    firings = db.scalars(select(Firing).where(Firing.status == "opened")).all()
+    if not firings:
+        return []
+    ids = [f.id for f in firings]
+
+    counts: dict[int, dict[str, int]] = {}
+    rows = db.execute(
+        select(Piece.firing_id, Piece.result, func.count())
+        .where(Piece.firing_id.in_(ids), Piece.result != "pending")
+        .group_by(Piece.firing_id, Piece.result)
+    ).all()
+    for fid, result, n in rows:
+        counts.setdefault(fid, {})[result] = n
+
+    groups: dict[int | str, KilnCrackStat] = {}
+    for f in firings:
+        key: int | str = f.kiln_id if f.kiln_id is not None else f"name:{f.kiln_name}"
+        g = groups.get(key)
+        if g is None:
+            g = groups[key] = KilnCrackStat(
+                kiln_id=f.kiln_id,
+                kiln_name=f.kiln_name,
+                opened_count=0,
+                total=0,
+                good=0,
+                cracked=0,
+                glaze_crawl=0,
+            )
+        g.opened_count += 1
+        c = counts.get(f.id, {})
+        g.total += sum(c.values())
+        g.good += c.get("good", 0)
+        g.cracked += c.get("cracked", 0)
+        g.glaze_crawl += c.get("glaze_crawl", 0)
+    return sorted(groups.values(), key=lambda g: (-g.cracked, g.kiln_name))

@@ -8,18 +8,47 @@ Phase = Literal["heat", "hold", "cool"]
 Result = Literal["pending", "good", "cracked", "glaze_crawl"]
 
 
+# ---- 窑炉档案 ----
+class KilnIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    shelf_layers: int = Field(ge=1, le=12)
+    slots_per_layer: int = Field(ge=1, le=24)
+    note: str = Field(default="", max_length=500)
+
+
+class KilnPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    shelf_layers: int | None = Field(default=None, ge=1, le=12)
+    slots_per_layer: int | None = Field(default=None, ge=1, le=24)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class KilnOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    shelf_layers: int
+    slots_per_layer: int
+    note: str
+    created_at: datetime
+    firing_count: int = 0  # 挂在这口窑名下的窑次数
+
+
 # ---- 窑次 ----
 class FiringCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
+    kiln_id: int | None = None  # 从档案选窑；不传走老逻辑，自由填 kiln_name
     kiln_name: str = Field(default="主窑", max_length=80)
     atmosphere: Atmosphere = "oxidation"
-    shelf_layers: int = Field(default=4, ge=1, le=12)
-    slots_per_layer: int = Field(default=6, ge=1, le=24)
+    shelf_layers: int | None = Field(default=None, ge=1, le=12)  # 空 = 用档案规格
+    slots_per_layer: int | None = Field(default=None, ge=1, le=24)
     note: str = Field(default="", max_length=2000)
 
 
 class FiringPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=80)
+    kiln_id: int | None = None  # 换挂到另一口窑；名字快照跟着换
     kiln_name: str | None = Field(default=None, max_length=80)
     atmosphere: Atmosphere | None = None
     note: str | None = Field(default=None, max_length=2000)
@@ -72,6 +101,7 @@ class FiringOut(BaseModel):
 
     id: int
     name: str
+    kiln_id: int | None
     kiln_name: str
     atmosphere: str
     status: str
@@ -130,6 +160,18 @@ class CrackStat(BaseModel):
     opened_at: datetime | None
     hold_minutes: int | None  # 那窑保温段烧了多少分钟
     total: int  # 出了窑登记了结果的件数
+    good: int
+    cracked: int
+    glaze_crawl: int
+
+
+class KilnCrackStat(BaseModel):
+    """按窑炉归组的开裂汇总。没挂档案的老窑次按名字自成一组，kiln_id 为 None。"""
+
+    kiln_id: int | None
+    kiln_name: str
+    opened_count: int  # 开了几窑
+    total: int
     good: int
     cracked: int
     glaze_crawl: int

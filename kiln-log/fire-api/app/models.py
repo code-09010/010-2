@@ -6,6 +6,23 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .database import Base
 
 
+class Kiln(Base):
+    """一口窑的档案。棚板层数、每层窑位是这口窑的固定规格，建窑次时自动带出。"""
+
+    __tablename__ = "kilns"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True)
+    shelf_layers: Mapped[int] = mapped_column(default=4)  # 棚板层数
+    slots_per_layer: Mapped[int] = mapped_column(default=6)  # 每层窑位数
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    firings: Mapped[list["Firing"]] = relationship(back_populates="kiln")
+
+
 class Firing(Base):
     """一窑（窑次）。"""
 
@@ -13,6 +30,10 @@ class Firing(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(80))
+    kiln_id: Mapped[int | None] = mapped_column(
+        ForeignKey("kilns.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # 建窑次时从档案抄下来的名字快照；档案删了这里还留着
     kiln_name: Mapped[str] = mapped_column(String(80), default="主窑")
     # oxidation 氧化 / reduction 还原
     atmosphere: Mapped[str] = mapped_column(String(10), default="oxidation")
@@ -31,6 +52,7 @@ class Firing(Base):
         DateTime(timezone=True), nullable=True
     )
 
+    kiln: Mapped[Kiln | None] = relationship(back_populates="firings")
     pieces: Mapped[list["Piece"]] = relationship(
         back_populates="firing", cascade="all, delete-orphan", order_by="Piece.id"
     )

@@ -13,6 +13,7 @@ const router = useRouter()
 const fid = Number(props.id)
 
 const firing = ref(null)
+const kilns = ref([])
 const error = ref('')
 const selectedId = ref(null) // 待摆坯件里被点中的
 const newPiece = ref('')
@@ -25,7 +26,7 @@ async function load() {
     if (!meta.value) {
       meta.value = {
         name: f.name,
-        kiln_name: f.kiln_name,
+        kiln_id: f.kiln_id,
         atmosphere: f.atmosphere,
         note: f.note,
         shelf_layers: f.shelf_layers,
@@ -36,7 +37,10 @@ async function load() {
     error.value = e.message
   }
 }
-onMounted(load)
+onMounted(() => {
+  load()
+  api.listKilns().then((ks) => (kilns.value = ks)).catch((e) => (error.value = e.message))
+})
 
 // 包一层：调接口、报错上墙、成功后重载
 function guard(fn) {
@@ -120,6 +124,17 @@ const resultSummary = computed(() => {
   for (const p of placed.value) s[p.result] = (s[p.result] || 0) + 1
   return s
 })
+const linkedKiln = computed(
+  () => kilns.value.find((k) => k.id === meta.value?.kiln_id) || null,
+)
+// 层数/窑位被改得和档案规格不一样时提一句：保存只影响这一窑
+const specDiverged = computed(
+  () =>
+    firing.value?.status === 'planned' &&
+    linkedKiln.value &&
+    (meta.value.shelf_layers !== linkedKiln.value.shelf_layers ||
+      meta.value.slots_per_layer !== linkedKiln.value.slots_per_layer),
+)
 const firingElapsed = computed(() => {
   const f = firing.value
   if (!f?.started_at) return ''
@@ -150,7 +165,13 @@ function fmt(dt) {
         </div>
       </div>
       <div class="meta-grid">
-        <label>窑炉<input v-model="meta.kiln_name" /></label>
+        <label>
+          窑炉
+          <select v-model="meta.kiln_id">
+            <option :value="null">未挂档案</option>
+            <option v-for="k in kilns" :key="k.id" :value="k.id">{{ k.name }}</option>
+          </select>
+        </label>
         <label>
           气氛
           <select v-model="meta.atmosphere">
@@ -162,9 +183,13 @@ function fmt(dt) {
           <label>棚板层数<input type="number" min="1" max="12" v-model.number="meta.shelf_layers" /></label>
           <label>每层窑位<input type="number" min="1" max="24" v-model.number="meta.slots_per_layer" /></label>
         </template>
-        <label class="meta-note">备注<input v-model="meta.note" placeholder="如：釉烧、气窑、昨晚那炉" /></label>
+        <label class="meta-note">备注<input v-model="meta.note" placeholder="如：釉烧、昨晚那炉" /></label>
         <div><button class="btn btn-sm" @click="saveMeta">保存信息</button></div>
       </div>
+      <p v-if="specDiverged" class="override-hint">
+        层数/窑位与「{{ linkedKiln.name }}」的档案规格（{{ linkedKiln.shelf_layers }} 层 ×
+        {{ linkedKiln.slots_per_layer }} 位）不一致，保存只改这一窑，档案不动。
+      </p>
       <p class="muted times">
         建于 {{ fmt(firing.created_at) }}
         <template v-if="firing.started_at"> · 点火 {{ fmt(firing.started_at) }}</template>

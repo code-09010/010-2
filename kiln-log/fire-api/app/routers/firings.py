@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
-from ..models import CurveSegment, Firing, Piece
+from ..models import CurveSegment, Firing, Kiln, Piece
 from ..schemas import (
     CurveIn,
     FiringCreate,
@@ -60,7 +60,19 @@ def list_firings(db: Session = Depends(get_db)):
 
 @router.post("", response_model=FiringOut, status_code=201)
 def create_firing(payload: FiringCreate, db: Session = Depends(get_db)):
-    firing = Firing(**payload.model_dump())
+    data = payload.model_dump()
+    kiln = None
+    if data["kiln_id"] is not None:
+        kiln = db.get(Kiln, data["kiln_id"])
+        if kiln is None:
+            raise HTTPException(404, "窑炉档案不存在")
+        data["kiln_name"] = kiln.name  # 快照档案名，不再手敲
+    # 层数窑位没显式填就用档案规格；填了就是这一窑的临时覆盖
+    data["shelf_layers"] = data["shelf_layers"] or (kiln.shelf_layers if kiln else 4)
+    data["slots_per_layer"] = data["slots_per_layer"] or (
+        kiln.slots_per_layer if kiln else 6
+    )
+    firing = Firing(**data)
     db.add(firing)
     db.commit()
     db.refresh(firing)
@@ -90,6 +102,16 @@ def firing_detail(firing_id: int, db: Session = Depends(get_db)):
 def patch_firing(firing_id: int, payload: FiringPatch, db: Session = Depends(get_db)):
     firing = get_firing_or_404(firing_id, db)
     data = payload.model_dump(exclude_unset=True)
+    if "kiln_id" in data:
+        kiln_id = data.pop("kiln_id")
+        if kiln_id is None:
+            firing.kiln_id = None  # 只摘档案，名字快照留着
+        else:
+            kiln = db.get(Kiln, kiln_id)
+            if kiln is None:
+                raise HTTPException(404, "窑炉档案不存在")
+            firing.kiln_id = kiln.id
+            data["kiln_name"] = kiln.name  # 换了档案，名字快照跟着换
     new_layers = data.get("shelf_layers", firing.shelf_layers)
     new_slots = data.get("slots_per_layer", firing.slots_per_layer)
     if (new_layers, new_slots) != (firing.shelf_layers, firing.slots_per_layer):

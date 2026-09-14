@@ -3,13 +3,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .database import init_db
-from .routers import firings, pieces, readings, stats
+from .database import SessionLocal, init_db
+from .migrate import run_migration
+from .routers import firings, kilns, pieces, readings, stats
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()  # 启动时建表，数据库没就绪会重试
+    with SessionLocal() as db:
+        run_migration(db)  # 补 kiln_id 列、按老 kiln_name 归并出窑炉档案，幂等
     yield
 
 
@@ -29,6 +32,7 @@ def health():
     return {"ok": True}
 
 
+app.include_router(kilns.router)
 app.include_router(firings.router)
 app.include_router(pieces.router)
 app.include_router(readings.router)

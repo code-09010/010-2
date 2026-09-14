@@ -23,6 +23,12 @@ const put = (path, data) => req(path, { method: 'PUT', body: JSON.stringify(data
 const del = (path) => req(path, { method: 'DELETE' })
 
 export const api = {
+  // 窑炉档案
+  listKilns: () => req('/kilns'),
+  createKiln: (data) => post('/kilns', data),
+  patchKiln: (id, data) => patch(`/kilns/${id}`, data),
+  deleteKiln: (id, reassignTo) =>
+    del(`/kilns/${id}${reassignTo ? `?reassign_to=${reassignTo}` : ''}`),
   // 窑次
   listFirings: () => req('/firings'),
   createFiring: (data) => post('/firings', data),
@@ -43,4 +49,5 @@ export const api = {
   deleteReading: (id) => del(`/readings/${id}`),
   // 统计
   crackStats: () => req('/stats/cracks?limit=10'),
+  crackStatsByKiln: () => req('/stats/cracks/by-kiln'),
 }
