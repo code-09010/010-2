@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kiln
+      POSTGRES_PASSWORD: kiln
+      POSTGRES_DB: kilnlog
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kiln -d kilnlog"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    # 想在宿主机直接连数据库查账时，把下面两行放开
+    # ports:
+    #   - "5432:5432"
+
+  fire-api:
+    build: ./fire-api
+    environment:
+      DATABASE_URL: postgresql+psycopg://kiln:kiln@db:5432/kilnlog
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  shelf-ui:
+    build: ./shelf-ui
+    depends_on:
+      - fire-api
+    ports:
+      - "8090:80"
+
+volumes:
+  db-data:
